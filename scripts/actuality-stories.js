@@ -98,8 +98,46 @@ async function sendTelegram(message) {
   console.log('✓ Telegram notification sent');
 }
 
-async function createCalendarEvent(topicsText) {
-  const credentials = JSON.parse(process.env.GOOGLE_CALENDAR_CREDENTIALS);
+async function getGoogleAccessToken() {
+  const refreshToken = process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+
+  const postData = `client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&refresh_token=${encodeURIComponent(refreshToken)}&grant_type=refresh_token`;
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'oauth2.googleapis.com',
+      path: '/token',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          if (response.access_token) {
+            resolve(response.access_token);
+          } else {
+            reject(new Error('No access token in response'));
+          }
+        } catch (e) {
+          reject(new Error(`Failed to parse token response: ${data}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(postData);
+    req.end();
+  });
+}
+
+async function createCalendarEvent(accessToken, topicsText) {
+  const calendarId = process.env.GOOGLE_CALENDAR_ID;
 
   const now = new Date();
   const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 7, 0, 0);
@@ -118,10 +156,37 @@ async function createCalendarEvent(topicsText) {
     }
   };
 
-  // Here we would call Google Calendar API
-  // For now, log the event details
-  console.log('📅 Calendar event prepared:', eventPayload.summary);
-  console.log('Description:', topicsText.substring(0, 100) + '...');
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(eventPayload);
+    const req = https.request({
+      hostname: 'www.googleapis.com',
+      path: `/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(body);
+          if (res.statusCode === 200 || res.statusCode === 201) {
+            resolve(response);
+          } else {
+            reject(new Error(`HTTP ${res.statusCode}: ${body}`));
+          }
+        } catch (e) {
+          reject(new Error(`Failed to parse response: ${body}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
 }
 
 async function main() {
@@ -142,7 +207,19 @@ async function main() {
     await sendTelegram(telegramMessage);
 
     // Create Calendar event
-    await createCalendarEvent(topicsText);
+    if (process.env.GOOGLE_CALENDAR_REFRESH_TOKEN && process.env.GOOGLE_CALENDAR_ID) {
+      try {
+        const accessToken = await getGoogleAccessToken();
+        console.log('✓ Got Google access token');
+
+        await createCalendarEvent(accessToken, topicsText);
+        console.log('✓ Calendar event created');
+      } catch (error) {
+        console.error('⚠ Failed to create calendar event:', error.message);
+      }
+    } else {
+      console.log('⚠ Skipping calendar event (credentials not set)');
+    }
 
     console.log('\n✅ Actuality stories completed successfully');
   } catch (error) {
