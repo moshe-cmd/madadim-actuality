@@ -1,0 +1,12 @@
+{
+  "name": "madadim-actuality-stories",
+  "version": "1.0.0",
+  "description": "Automated weekly mortgage and finance topics for Israeli market",
+  "main": "scripts/actuality-stories.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["mortgage", "finance", "automation", "telegram", "calendar"],
+  "author": "Moshe Albaz",
+  "license": "MIT"
+}
