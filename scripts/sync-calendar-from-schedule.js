@@ -93,24 +93,35 @@ async function syncCalendarFromSchedule() {
   let eventCount = 0;
 
   for (const [dateStr, taskData] of Object.entries(schedule.schedule)) {
-    // Parse the task time
-    const [hours, minutes] = (taskData.time || '09:00').split(':');
-    const [year, month, day] = dateStr.split('-');
+    try {
+      // Parse the task time
+      const timeStr = taskData.time || '09:00';
+      const [hours, minutes] = timeStr.split(':');
+      const [year, month, day] = dateStr.split('-');
 
-    // Create event start and end times
-    const eventStart = new Date(year, parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes), 0);
-    const eventEnd = new Date(year, parseInt(month) - 1, parseInt(day), parseInt(hours) + 1, parseInt(minutes), 0);
+      const h = parseInt(hours);
+      const m = parseInt(minutes);
+      const y = parseInt(year);
+      const mo = parseInt(month) - 1;
+      const d = parseInt(day);
 
-    const event = {
-      summary: `${taskData.type ? '📺 ' : ''}${taskData.title}`,
-      description: `סוג: ${taskData.type}\n\nתסריט:\n${taskData.script || taskData.script_start || '—'}\n\nCTA: ${taskData.cta || '—'}${taskData.series ? `\n\nסדרה: ${taskData.series}` : ''}`,
-      start: { dateTime: eventStart.toISOString(), timeZone: 'Asia/Jerusalem' },
-      end: { dateTime: eventEnd.toISOString(), timeZone: 'Asia/Jerusalem' },
-    };
+      // Create event start and end times
+      const eventStart = new Date(y, mo, d, h, m, 0);
+      const eventEnd = new Date(y, mo, d, h + 1, m, 0);
 
-    await createCalendarEvent(accessToken, event);
-    eventCount++;
-    console.log(`✓ Event created for ${dateStr}: ${taskData.title}`);
+      const event = {
+        summary: `${taskData.type ? '📺 ' : ''}${taskData.title}`,
+        description: `סוג: ${taskData.type}\n\nתסריט:\n${taskData.script || taskData.script_start || '—'}\n\nCTA: ${taskData.cta || '—'}${taskData.series ? `\n\nסדרה: ${taskData.series}` : ''}`,
+        start: { dateTime: eventStart.toISOString(), timeZone: 'Asia/Jerusalem' },
+        end: { dateTime: eventEnd.toISOString(), timeZone: 'Asia/Jerusalem' },
+      };
+
+      await createCalendarEvent(accessToken, event);
+      eventCount++;
+      console.log(`✓ Event created for ${dateStr}: ${taskData.title}`);
+    } catch (error) {
+      console.error(`⚠ Failed to create event for ${dateStr}: ${error.message}`);
+    }
   }
 
   console.log(`\n✅ ${eventCount} calendar events synced successfully`);
