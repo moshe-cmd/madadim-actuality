@@ -93,14 +93,12 @@ async function syncCalendarFromSchedule() {
   let eventCount = 0;
 
   for (const [dateStr, taskData] of Object.entries(schedule.schedule)) {
-    const [year, month, day] = dateStr.split('-');
-
     // Parse the task time
     const [hours, minutes] = (taskData.time || '09:00').split(':');
 
-    // Create event start and end times
-    const eventStart = new Date(`${dateStr}T${hours}:${minutes}:00+03:00`);
-    const eventEnd = new Date(`${dateStr}T${String(parseInt(hours) + 1).padStart(2, '0')}:${minutes}:00+03:00`);
+    // Create event start and end times (UTC, will be converted to Israel timezone by API)
+    const eventStart = new Date(`${dateStr}T${hours}:${minutes}:00Z`);
+    const eventEnd = new Date(`${dateStr}T${String(parseInt(hours) + 1).padStart(2, '0')}:${minutes}:00Z`);
 
     const event = {
       summary: `${taskData.type ? '📺 ' : ''}${taskData.title}`,
